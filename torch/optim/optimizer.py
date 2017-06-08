@@ -3,6 +3,8 @@ from copy import deepcopy
 from collections import defalutdict
 from torch.autograd import Variable
 
+required = object()
+
 class Optimizer(object):
     def __init__(self, params, defaults):
         self.state = defaultdict(dict)
