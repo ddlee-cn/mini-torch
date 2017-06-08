@@ -3,7 +3,7 @@ from collections import OrderedDict
 import torch.sparse as sparse
 import torch.utils.hooks as hooks
 from ._functions import *
-from torch._C import _ImperativeEngine as ImperativeEngine
+from torch._C import _ImperativeEngine as ImperativeEngine # for backward
 Variable._execution_engine = ImperativeEngine()
 
 class Variable(_C._VariableBase):

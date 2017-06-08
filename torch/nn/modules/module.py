@@ -1,4 +1,5 @@
 import torch
+from ..backends.thnn import backend as thnn_backend
 from torch.autograd import Variable
 from ..parameter import Parameter
 import torch.utils.hooks as hooks
