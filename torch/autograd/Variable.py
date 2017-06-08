@@ -89,3 +89,20 @@ class Variable(_C._VariableBase):
         self._grad_fn = None
         self.requires_grad = False
 
+    @staticmethod
+    def _static_blas(cls, args, inplace):
+        num_args = len(args)
+        alpha = beta = 1
+        if num_args > 5:
+            raise RuntimeError("too many args")
+        if num_args == 5:
+            alpha, beta = args[1:3]
+        if num_args == 4:
+            alpha = args[1]
+        return cls.apply(*(args[:1] + args[-2:] + (alpha, beta, inplace)))
+
+    def _blas(self, cls, args, inplace):
+        return self._static_blas(cls, (self,) + args, inplace)
+
+    def addmm_(self, *args):
+        return self._blas(Addmm, args, True)
