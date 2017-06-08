@@ -84,3 +84,131 @@ class Module(object):
                 functools.update_wrapper(wrapper, hook)
                 grad_fn.register_hook(wrapper)
         return result
+
+    def __getattr__(self, name):
+        # bind get attributes method
+        pass
+
+    def __setattr__(self, name, value):
+        # bind set attributes method: parameter, module and buffer
+        def remove_from(*dicts):
+            for d in dicts:
+                if name in d:
+                    del d[name]
+
+        params = self.__dict__.get('_parameters')
+        if isinstance(value, Parameter):
+            remove_from(self.__dict__, self._buffers, self._modules)
+            self.register_parameter(name, value)
+        else:
+            modules = self.__dict__.get('_modules')
+            if isinstance(value, module):
+                remove_from(self.__dict__, self._parameters, self._buffers)
+                modules[name] = value
+            else:
+                buffers = self.__dict__.get('_buffers')
+                if buffers is not None and name in buffers:
+                    buffers[name] = value
+                else:
+                    object.__setattr__(self, name, value)
+
+    def __delattr__(self, name):
+        # del attr
+        pass
+
+    def state_dict(self, destination=None, prefix=''):
+        # Returns a dictionary containing a whole state of the module.
+        for name, param in self._parameters.items():
+                destination[prefix + name] = param.data
+        for name, buf in self._buffers.items():
+                destination[prefix + name] = buf
+        for name, module in self._modules.items():
+                module.state_dict(destination, prefix + name + '.')
+        return destination
+
+    def load_state_dict(self, state_dict):
+        # copies parameters and buffers from state_dict into module
+        # and its descendants
+        own_state = self.state_dict()
+        for name, param in state_dict.items():
+            param = param.data
+            own_state[name].copy_(param)
+
+    def parameters(self, memo=None):
+        # return an iterator over module params
+        for name, param in self.name_parameters():
+            yield param
+
+    def named_parameters(self, memo=None, prefix=''):
+        for name, p in self._parameters.items():
+            if p is not none and p not in memo:
+                memo.add(p)
+                yield prefix + ('.' if prefix else '') + name, p
+        for mname, module in self.named_childer():
+            submodule_prefix = prefix + ('.' if prefix else '') + mname
+            for name, p in module.named_parameters(memo, submodule_prefix):
+                yield name, p
+
+    def children(self):
+        # Returns an iterator over immediate children modules.
+        for name, module in self.named_children():
+            yield module
+
+    def named_children(self):
+        memo = set()
+        for name, module in self._modules.items():
+            if module is not None and module not in memo:
+                memo.add(module)
+                yield name, module
+
+    def modules(self):
+        # Returns an iterator over all modules in the network.
+        for name, module in self.named_modules():
+            yield module
+
+    def named_modules(self, memo=None, prefix=''):
+        if self not in memo:
+            memo.add(self)
+            yield prefix, self
+            for name, module in self._modules.items():
+                submodule_prefix = prefix + ('.' if prefix else '') + name
+                for m in module.named_modules(memo, submodule_prefix):
+                    yield m
+
+    def train(self, mode=True):
+        # set module into training mode
+        self.training = mode
+        for module in self.children():
+            module.train(mode)
+        return self
+
+    def eval(self):
+        # set module into evaluation mode
+        return self.train(False)
+
+    def zero_grad(self):
+        for p in self.parameters():
+            if p.grad is not None:
+                p.grad.data.zero_()
+                p.grad.detach_()
+
+    def share_memory(self):
+        return self._apply(lambda t: t.share_memory_())
+
+    def __repr__(self):
+        tmpstr = self.__class__.__name__ + ' (\n'
+        for key, module in self._modules.items():
+            modstr = module.__repr__()
+            modstr = _addindent(modstr, 2)
+            tmpstr = tmpstr + '  (' + key + '): ' + modstr + '\n'
+        tmpstr = tmpstr + ')'
+        return tmpstr
+
+    def __dir__(self):
+        module_attrs = dir(self.__class__)
+        attrs = list(self.__dict__.keys())
+        parameters = list(self._parameters.keys())
+        modules = list(self._modules.keys())
+        buffers = list(self._buffers.keys())
+        keys = module_attrs + attrs + parameters + modules + buffers
+        return sorted(keys)
