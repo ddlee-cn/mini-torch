@@ -144,7 +144,7 @@ class Module(object):
             if p is not none and p not in memo:
                 memo.add(p)
                 yield prefix + ('.' if prefix else '') + name, p
-        for mname, module in self.named_childer():
+        for mname, module in self.named_children():
             submodule_prefix = prefix + ('.' if prefix else '') + mname
             for name, p in module.named_parameters(memo, submodule_prefix):
                 yield name, p
